@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "ClaimIt",
+  description: "Lost It, List It, Claim It",
+  generator: "developer",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

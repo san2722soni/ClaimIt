@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
 import type { User, PostFormData } from "@/components/types"
 
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -22,6 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { Upload, X, Image as ImageIcon } from "lucide-react"
 
 // Available item categories
 const categories = ["ID Cards", "Electronics", "Stationary", "Clothing", "Other"] as const
@@ -60,7 +62,6 @@ const postFormSchema = z.object({
   
   descriptionImage: z
     .string()
-    .url("Please enter a valid URL")
     .optional()
     .or(z.literal("")),
   
@@ -79,6 +80,9 @@ interface PostFormProps {
 }
 
 export function PostForm({ type, currentUser, onSubmit }: PostFormProps) {
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
   // Initialize form with React Hook Form and Zod resolver
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -93,6 +97,54 @@ export function PostForm({ type, currentUser, onSubmit }: PostFormProps) {
     },
   })
 
+  // Handle image upload
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a valid image file (JPEG, PNG, or WebP)')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    const maxSizeInBytes = 5 * 1024 * 1024
+    if (file.size > maxSizeInBytes) {
+      alert('Image must be smaller than 5MB')
+      return
+    }
+
+    setIsUploading(true)
+
+    try {
+      // Convert file to base64 for preview
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64String = reader.result as string
+        setUploadedImage(base64String)
+        form.setValue('descriptionImage', base64String)
+      }
+      reader.readAsDataURL(file)
+
+      // In a real app, you would upload to a cloud service here
+      // For now, we'll just use the base64 string
+      
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('Error uploading image. Please try again.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Handle image removal
+  const handleImageRemove = () => {
+    setUploadedImage(null)
+    form.setValue('descriptionImage', '')
+  }
+
   // Handle form submission with validation
   const handleSubmit = (values: PostFormValues) => {
     const payload: PostFormData = {
@@ -106,202 +158,284 @@ export function PostForm({ type, currentUser, onSubmit }: PostFormProps) {
     
     onSubmit(payload)
     form.reset() // Reset form after successful submission
+    setUploadedImage(null) // Clear uploaded image
   }
 
   const isLost = type === "lost"
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className={isLost ? "text-destructive" : "text-emerald-600"}>
+    <Card className="w-full mx-auto">
+      <CardHeader className="pb-4">
+        <CardTitle className={`text-xl ${isLost ? "text-destructive" : "text-emerald-600"}`}>
           Report {isLost ? "Lost" : "Found"} Item
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           {isLost
             ? "Help us help you find your lost item by providing detailed information"
             : "Help reunite someone with their lost item by reporting what you found"}
         </CardDescription>
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="pt-0">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             
-            {/* Item Name Field */}
-            <FormField
-              control={form.control}
-              name="itemName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., Black Wallet, AirPods Gen 3, Blue Hoodie"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Enter a brief, descriptive name for the item
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Item Description Field */}
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the item in detail - color, brand, size, distinctive features, etc."
-                      rows={3}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Provide detailed description to help with identification
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Category and Date Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Two Column Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* Category Field */}
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+              {/* Left Column */}
+              <div className="space-y-4">
+                {/* Item Name Field */}
+                <FormField
+                  control={form.control}
+                  name="itemName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Item Name</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
+                        <Input
+                          placeholder="e.g., Black Wallet, AirPods"
+                          className="h-9"
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Date Field */}
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      When did you {isLost ? "lose" : "find"} it?
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Date must be within the last 30 days
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                {/* Category Field */}
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Date Field */}
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        When did you {isLost ? "lose" : "find"} it?
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="date" className="h-9" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Within the last 30 days
+                      </FormDescription>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Contact Phone Field */}
+                <FormField
+                  control={form.control}
+                  name="contactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Contact Phone</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="tel"
+                          placeholder="+91 98765 43210"
+                          className="h-9"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        For WhatsApp contact
+                      </FormDescription>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-4">
+                {/* Location Field */}
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Where did you {isLost ? "lose" : "find"} it?
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Library, Cafeteria, Room 101"
+                          className="h-9"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Be as specific as possible
+                      </FormDescription>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Item Description Field */}
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe color, brand, size, distinctive features..."
+                          rows={2}
+                          className="min-h-[60px] resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Detailed description for identification
+                      </FormDescription>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Image Upload Field */}
+                <FormField
+                  control={form.control}
+                  name="descriptionImage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Item Image (Optional)</FormLabel>
+                      <FormControl>
+                        <div className="space-y-3">
+                          {/* Upload Button */}
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              disabled={isUploading}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full h-9 border-dashed"
+                              disabled={isUploading}
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              {isUploading ? "Uploading..." : "Upload Image"}
+                            </Button>
+                          </div>
+                          
+                          {/* Image Preview/Showcase */}
+                          {uploadedImage && (
+                            <div className="relative">
+                              <div className="border-2 border-dashed border-gray-200 rounded-lg p-3 bg-gray-50">
+                                <div className="flex items-start gap-3">
+                                  {/* Image Preview */}
+                                  <div className="relative flex-shrink-0">
+                                    <img
+                                      src={uploadedImage}
+                                      alt="Item preview"
+                                      className="w-20 h-20 object-cover rounded-md border"
+                                    />
+                                    {/* Remove Button */}
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full p-0"
+                                      onClick={handleImageRemove}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Image Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1 text-sm font-medium text-green-700">
+                                      <ImageIcon className="w-4 h-4" />
+                                      Image uploaded successfully
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      Click the × button to remove this image
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Alternative URL Input */}
+                          <div className="text-xs text-center text-gray-500">
+                            or
+                          </div>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/image.jpg"
+                            className="h-9"
+                            value={uploadedImage ? "" : field.value || ""}
+                            onChange={(e) => {
+                              if (!uploadedImage) {
+                                field.onChange(e.target.value)
+                              }
+                            }}
+                            disabled={!!uploadedImage}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Upload an image or paste an image URL
+                      </FormDescription>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
-            {/* Location Field */}
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Where did you {isLost ? "lose" : "find"} it?
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., Library, Cafeteria, Parking Lot, Room 101"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Be as specific as possible about the location
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Optional Image Field */}
-            <FormField
-              control={form.control}
-              name="descriptionImage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Image (Optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Add an image URL if you have a photo of the item
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Contact Phone Field */}
-            <FormField
-              control={form.control}
-              name="contactPhone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contact Phone (for WhatsApp)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="tel"
-                      placeholder="e.g., +91 98765 43210"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Your number will be used to generate a WhatsApp contact link
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={form.formState.isSubmitting}
-              className={`w-full ${
-                isLost 
-                  ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" 
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white"
-              }`}
-            >
-              {form.formState.isSubmitting 
-                ? "Submitting..." 
-                : `Report ${isLost ? "Lost" : "Found"} Item`
-              }
-            </Button>
+            {/* Submit Button - Full Width */}
+            <div className="pt-2">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className={`w-full h-10 ${
+                  isLost 
+                    ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" 
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                }`}
+              >
+                {form.formState.isSubmitting 
+                  ? "Submitting..." 
+                  : `Report ${isLost ? "Lost" : "Found"} Item`
+                }
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>
